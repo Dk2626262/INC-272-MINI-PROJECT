@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>INC272 — Smart Room Monitor</title>
+  <style>
+    /* ── Global reset & font ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #0f1117;
+      color: #e0e6f0;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    header h1 { font-size: 1.7rem; letter-spacing: 1px; color: #7eb8f7; }
+    header p  { font-size: 0.85rem; color: #8899aa; margin-top: 4px; }
+
+    /* ── Connection status bar ── */
+    #status-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #1a1f2e;
+      border: 1px solid #2a3244;
+      border-radius: 8px;
+      padding: 10px 16px;
+      margin-bottom: 24px;
+      font-size: 0.85rem;
+    }
+    #status-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: #ff4444;
+      transition: background 0.3s;
+      flex-shrink: 0;
+    }
+    #status-dot.connected  { background: #44dd88; box-shadow: 0 0 6px #44dd88; }
+    #status-dot.connecting { background: #ffaa33; }
+    #status-text { flex: 1; }
+    #last-msg { color: #556677; font-size: 0.78rem; margin-left: auto; }
+
+    /* ── Grid layout ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 18px;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: #1a1f2e;
+      border: 1px solid #2a3244;
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .card h2 {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #5577aa;
+      margin-bottom: 16px;
+    }
+
+    /* ── ADC Gauges (monitoring) ── */
+    .gauge-row { display: flex; flex-direction: column; gap: 10px; }
+    .gauge-item label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      color: #aabbcc;
+      margin-bottom: 4px;
+    }
+    .gauge-item label span { color: #7eb8f7; font-weight: bold; }
+    .bar-track {
+      height: 10px;
+      background: #0f1117;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #2255cc, #44aaff);
+      border-radius: 99px;
+      transition: width 0.4s ease;
+    }
+
+    /* ── PSW switches (monitoring) ── */
+    .switch-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .switch-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #0f1117;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.85rem;
+    }
+    .psw-dot {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: #223;
+      border: 2px solid #334;
+      transition: background 0.2s, box-shadow 0.2s;
+      flex-shrink: 0;
+    }
+    .psw-dot.on {
+      background: #44dd88;
+      border-color: #44dd88;
+      box-shadow: 0 0 8px #44dd88;
+    }
+
+    /* ── LED controls (control) ── */
+    .led-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .led-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      background: #0f1117;
+      border: 1px solid #2a3244;
+      border-radius: 10px;
+      padding: 14px 8px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .led-btn:hover { border-color: #4477aa; }
+    .led-icon {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: #223;
+      border: 2px solid #334;
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+    .led-icon.on {
+      background: #ffdd44;
+      border-color: #ffdd44;
+      box-shadow: 0 0 12px #ffdd44;
+    }
+    .led-label { font-size: 0.78rem; color: #8899aa; }
+    .led-state { font-size: 0.7rem; color: #556677; }
+
+    /* ── PWM slider (control) ── */
+    .pwm-row { display: flex; flex-direction: column; gap: 14px; }
+    .pwm-item label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      color: #aabbcc;
+      margin-bottom: 6px;
+    }
+    .pwm-item label span { color: #ffaa55; font-weight: bold; }
+    .pwm-item input[type=range] {
+      width: 100%;
+      accent-color: #ffaa55;
+      cursor: pointer;
+    }
+
+    /* ── Polling controls ── */
+    .controls-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 6px;
+    }
+    button.action-btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    button.action-btn:hover { opacity: 0.85; }
+    #btn-start { background: #2255cc; color: #fff; }
+    #btn-stop  { background: #332244; color: #aabbcc; }
+
+    /* ── Log panel ── */
+    #log {
+      margin-top: 24px;
+      background: #0a0d14;
+      border: 1px solid #1e2535;
+      border-radius: 10px;
+      padding: 14px;
+      height: 120px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: #556677;
+    }
+    #log p { margin-bottom: 3px; }
+    #log p.sent    { color: #ffaa55; }
+    #log p.recv    { color: #44dd88; }
+    #log p.info    { color: #7eb8f7; }
+    #log p.err     { color: #ff5555; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🏠 Smart Room Monitor</h1>
+  <p>INC272 Web-Based IoT Applications — Group Final Project</p>
+</header>
+
+<!-- CONNECTION STATUS -->
+<div id="status-bar">
+  <div id="status-dot"></div>
+  <span id="status-text">Disconnected</span>
+  <span id="last-msg"></span>
+</div>
+
+<div class="grid">
+
+  <!-- MONITORING: ADC Gauges -->
+  <div class="card">
+    <h2>📊 Sensor Readings (ADC)</h2>
+    <div class="gauge-row">
+      <div class="gauge-item">
+        <label>Temperature <span id="adc0-val">0</span> / 1023</label>
+        <div class="bar-track"><div class="bar-fill" id="adc0-bar"></div></div>
+      </div>
+      <div class="gauge-item">
+        <label>Humidity <span id="adc1-val">0</span> / 1023</label>
+        <div class="bar-track"><div class="bar-fill" id="adc1-bar"></div></div>
+      </div>
+      <div class="gauge-item">
+        <label>Light Level <span id="adc2-val">0</span> / 1023</label>
+        <div class="bar-track"><div class="bar-fill" id="adc2-bar"></div></div>
+      </div>
+      <div class="gauge-item">
+        <label>CO2 Level <span id="adc3-val">0</span> / 1023</label>
+        <div class="bar-track"><div class="bar-fill" id="adc3-bar"></div></div>
+      </div>
+    </div>
+    <div class="controls-row" style="margin-top:16px;">
+      <button class="action-btn" id="btn-start">▶ Start </button>
+      <button class="action-btn" id="btn-stop">■ Stop</button>
+    </div>
+  </div>
+
+  <!-- MONITORING: Push Switches -->
+  <div class="card">
+    <h2>🔘 Push Switch Status (PSW)</h2>
+    <div class="switch-row">
+      <div class="switch-item">
+        <div class="psw-dot" id="psw0"></div>
+        <span>Switch 0</span>
+      </div>
+      <div class="switch-item">
+        <div class="psw-dot" id="psw1"></div>
+        <span>Switch 1</span>
+      </div>
+      <div class="switch-item">
+        <div class="psw-dot" id="psw2"></div>
+        <span>Switch 2</span>
+      </div>
+      <div class="switch-item">
+        <div class="psw-dot" id="psw3"></div>
+        <span>Switch 3</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTROL: LED Toggles -->
+  <div class="card">
+    <h2>💡 LED Control</h2>
+    <div class="led-row">
+      <div class="led-btn" id="led0-btn" onclick="toggleLED(0)">
+        <div class="led-icon" id="led0-icon"></div>
+        <span class="led-label">LED 0</span>
+        <span class="led-state" id="led0-state">OFF</span>
+      </div>
+      <div class="led-btn" id="led1-btn" onclick="toggleLED(1)">
+        <div class="led-icon" id="led1-icon"></div>
+        <span class="led-label">LED 1</span>
+        <span class="led-state" id="led1-state">OFF</span>
+      </div>
+      <div class="led-btn" id="led2-btn" onclick="toggleLED(2)">
+        <div class="led-icon" id="led2-icon"></div>
+        <span class="led-label">LED 2</span>
+        <span class="led-state" id="led2-state">OFF</span>
+      </div>
+      <div class="led-btn" id="led3-btn" onclick="toggleLED(3)">
+        <div class="led-icon" id="led3-icon"></div>
+        <span class="led-label">LED 3</span>
+        <span class="led-state" id="led3-state">OFF</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTROL: PWM Sliders -->
+  <div class="card">
+    <h2>🎚️ PWM Fan Speed Control</h2>
+    <div class="pwm-row">
+      <div class="pwm-item">
+        <label>Fan 0 <span id="pwm0-val">0</span>%</label>
+        <input type="range" id="pwm0" min="0" max="100" value="0"
+               oninput="setPWM(0, this.value)" />
+      </div>
+      <div class="pwm-item">
+        <label>Fan 1 <span id="pwm1-val">0</span>%</label>
+        <input type="range" id="pwm1" min="0" max="100" value="0"
+               oninput="setPWM(1, this.value)" />
+      </div>
+      <div class="pwm-item">
+        <label>Fan 2 <span id="pwm2-val">0</span>%</label>
+        <input type="range" id="pwm2" min="0" max="100" value="0"
+               oninput="setPWM(2, this.value)" />
+      </div>
+      <div class="pwm-item">
+        <label>Fan 3 <span id="pwm3-val">0</span>%</label>
+        <input type="range" id="pwm3" min="0" max="100" value="0"
+               oninput="setPWM(3, this.value)" />
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- LOG PANEL -->
+<div id="log"><p class="info">— Log ready —</p></div>
+
+<script src="main.js"></script>
+</body>
+</html>
