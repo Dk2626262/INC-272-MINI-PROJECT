@@ -82,3 +82,5 @@ At least 2 features are required — this project uses all four:
 ![alt text](<Screenshot 2026-05-11 114332.png>) 
 ![alt text](<Screenshot 2026-05-11 113804.png>)
 ![alt text](image-1.png)
+<img width="1882" height="822" alt="Screenshot 2026-05-11 115714" src="https://github.com/user-attachments/assets/77f27557-23fc-4b76-8583-a3c9a67251a2" />
+
